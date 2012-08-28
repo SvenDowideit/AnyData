@@ -51,41 +51,40 @@ $VERSION = '0.05';
 sub read_fields {
     my $self = shift;
     my $str  = shift;
-    if (!$self->{pattern}) {
-      print "NO UNPACK PATTERN SPECIFIED!"; exit;
-    } 
+    if ( !$self->{pattern} ) {
+        print "NO UNPACK PATTERN SPECIFIED!";
+        exit;
+    }
     my @fields = unpack $self->{pattern}, $str;
-    if ($self->{trim}) {
-        @fields = map {s/^\s+//; s/\s+$//; $_} @fields;
+    if ( $self->{trim} ) {
+        @fields = map { s/^\s+//; s/\s+$//; $_ } @fields;
     }
     return @fields;
 }
 
 sub write_fields {
-    my $self   = shift;
-    my @fields = @_;
-    my $fieldNum =0;
+    my $self       = shift;
+    my @fields     = @_;
+    my $fieldNum   = 0;
     my $patternStr = $self->{pattern} || '';
     $patternStr =~ s/[a-zA-Z]//gi;
     my @fieldLengths = split /\s+/, $patternStr;
     my $fieldStr = '';
-    for(@fields) {
+    for (@fields) {
         next unless $_;
+
         # PAD OR TRUNCATE DATA TO FIT WITHIN FIELD LENGTHS
         my $oldLen = length $_ || 0;
-        my $newLen =  $fieldLengths[$fieldNum] || 0;
-        if ($oldLen < $newLen) { $_ = sprintf "%-${newLen}s",$_; }
-        if ($oldLen > $newLen) { $_ = substr $_, 0, $newLen; }
+        my $newLen = $fieldLengths[$fieldNum] || 0;
+        if ( $oldLen < $newLen ) { $_ = sprintf "%-${newLen}s", $_; }
+        if ( $oldLen > $newLen ) { $_ = substr $_, 0, $newLen; }
         $fieldNum++;
         $fieldStr .= $_;
     }
     $fieldStr .= $self->{record_sep};
-#print "<$fieldStr>";
+
+    #print "<$fieldStr>";
     return $fieldStr;
 }
 1;
-
-
-
-
 

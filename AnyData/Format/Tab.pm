@@ -61,9 +61,7 @@ sub new {
     my $class = shift;
     my $flags = shift || {};
     $flags->{field_sep} ||= qq(\t);
-    my $self  = AnyData::Format::CSV::->new(
-        $flags
-    );
+    my $self = AnyData::Format::CSV::->new( $flags );
     return bless $self, $class;
 }
 1;

@@ -49,17 +49,16 @@ use vars qw/@ISA $VERSION/;
 
 $VERSION = '0.05';
 
-
 sub new {
     my $class = shift;
     my $flags = shift || {};
     $flags->{field_sep} ||= '=';
-    my $self  = AnyData::Format::CSV::->new( $flags );
+    my $self = AnyData::Format::CSV::->new($flags);
     return bless $self, $class;
 }
 
-sub write_fields  {
-    my($self,$key,$value) = @_;
+sub write_fields {
+    my ( $self, $key, $value ) = @_;
     return undef unless $key;
     $value ||= '';
     return "$key = $value" . $self->{record_sep};
@@ -67,13 +66,12 @@ sub write_fields  {
 
 sub read_fields {
     my $self = shift;
-    my $str  = shift || return undef;
+    my $str = shift || return undef;
     $str =~ s/^\s+//;
     $str =~ s/\s+$//;
     return undef unless $str;
     my @fields = $str =~ /^([^=]*?)\s*=\s*(.*)/;
     die "Couldn't parse line '$str'\n" unless defined $fields[0];
-    return( @fields );
+    return (@fields);
 }
-
 

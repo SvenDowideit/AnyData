@@ -65,12 +65,8 @@ sub new {
     $flags->{col_names} = 'username,passwd,UID,GID,fullname,homedir,shell';
     $flags->{key}       = 'username';
     $flags->{keep_first_line} = 1;
-    my $self  = AnyData::Format::CSV::->new(
-        $flags
-    );
+    my $self = AnyData::Format::CSV::->new( $flags );
     return bless $self, $class;
 }
 1;
-
-
 

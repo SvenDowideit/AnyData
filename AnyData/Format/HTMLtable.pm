@@ -91,42 +91,43 @@ $VERSION = '0.05';
 
 sub new {
     my $class = shift;
-    my $self  = shift ||  {};
+    my $self = shift || {};
     $self->{export_on_close} = 1;
-    $self->{slurp_mode} = 1;
+    $self->{slurp_mode}      = 1;
     return bless $self, $class;
 }
 
 sub storage_type { 'RAM'; }
 
 sub import {
-    my $self = shift;
-    my $data = shift;
+    my $self    = shift;
+    my $data    = shift;
     my $storage = shift;
-    return $self->get_data($data,$self->{col_names});
+    return $self->get_data( $data, $self->{col_names} );
 }
+
 sub get_data {
-    my $self = shift;
+    my $self      = shift;
     my $str       = shift or return undef;
     my $col_names = shift;
     require HTML::TableExtract;
-    my $count   = $self->{count} || 0;
-    my $depth   = $self->{depth} || 0;
+    my $count   = $self->{count}   || 0;
+    my $depth   = $self->{depth}   || 0;
     my $headers = $self->{headers} || $self->{col_names} || undef;
     my %flags;
-    if (defined $count or defined $depth or defined $headers) {
-        $flags{count} = $count if defined $count;
-        $flags{depth} = $depth if defined $depth;
+
+    if ( defined $count or defined $depth or defined $headers ) {
+        $flags{count}   = $count   if defined $count;
+        $flags{depth}   = $depth   if defined $depth;
         $flags{headers} = $headers if defined $headers;
     }
     else {
-        %flags = $col_names
-            ? ( headers => $col_names )
-            : (count=>$count,depth=>$depth);
+        %flags =
+          $col_names
+          ? ( headers => $col_names )
+          : ( count => $count, depth => $depth );
     }
-    my $te = new HTML::TableExtract(
-         %flags
-    );
+    my $te = new HTML::TableExtract( %flags );
     $te->parse($str);
     my $table;
     @$table = $te->rows;
@@ -135,29 +136,30 @@ sub get_data {
 }
 
 sub export {
+
     #print "EXPORTING!";
     my $self      = shift;
     my $storage   = shift;
     my $col_names = $storage->{col_names};
     my $table     = $storage->{records};
+
     #use Data::Dumper; print Dumper $table; print "###"; exit;
-    my $fh        = $storage->{fh};
+    my $fh = $storage->{fh};
     use CGI;
-    my $table_flags = shift || {Border=>1,bgColor=>'white'};
-    my $top_row_flags = shift || {bgColor=>'#c0c0c0'};
+    my $table_flags = shift || { Border => 1, bgColor => 'white' };
+    my $top_row_flags = shift || { bgColor => '#c0c0c0' };
     my $data_row_flags = shift || {};
     @$table = map {
         my $row = $_;
         @$row = map { $_ || '&nbsp;' } @$row;
         $row;
     } @$table;
-    my $str = 
-        CGI::table(
-            $table_flags,
-            CGI::Tr( $top_row_flags, CGI::th($col_names) ),
-            map CGI::Tr( $data_row_flags, CGI::td($_) ), @$table
-        );
-    $fh->write($str,length $str) if $fh;
+    my $str = CGI::table(
+        $table_flags,
+        CGI::Tr( $top_row_flags, CGI::th($col_names) ),
+        map CGI::Tr( $data_row_flags, CGI::td($_) ), @$table
+    );
+    $fh->write( $str, length $str ) if $fh;
     return $str;
 }
 
@@ -166,22 +168,14 @@ sub exportOLD {
     my $table     = shift;
     my $col_names = shift;
     use CGI;
-    my $table_flags = shift || {Border=>1,bgColor=>'white'};
-    my $top_row_flags = shift || {bgColor=>'#c0c0c0'};
+    my $table_flags = shift || { Border => 1, bgColor => 'white' };
+    my $top_row_flags = shift || { bgColor => '#c0c0c0' };
     my $data_row_flags = shift || {};
-    return
-        CGI::table(
-            $table_flags,
-            CGI::Tr( $top_row_flags, CGI::th($col_names) ),
-            map CGI::Tr( $data_row_flags, CGI::td($_) ), @$table
-        );
+    return CGI::table(
+        $table_flags,
+        CGI::Tr( $top_row_flags, CGI::th($col_names) ),
+        map CGI::Tr( $data_row_flags, CGI::td($_) ), @$table
+    );
 }
 1;
-
-
-
-
-
-
-
 

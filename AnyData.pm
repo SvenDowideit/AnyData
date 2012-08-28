@@ -11,99 +11,112 @@ require Exporter;
 use AnyData::Storage::TiedHash;
 use vars qw( @ISA @EXPORT $VERSION );
 @ISA = qw(Exporter);
-@EXPORT = qw(  adConvert adTie adRows adColumn adExport adDump adNames adFormats);
+@EXPORT =
+  qw(  adConvert adTie adRows adColumn adExport adDump adNames adFormats);
+
 #@EXPORT = qw(  ad_fields adTable adErr adArray);
 
 $VERSION = '0.10';
 
 sub new {
-   my $class   = shift;
-   my $format  = shift;
-   my $flags   = shift || {};
-   my $del_marker = "\0";
-   $format = 'CSV' if $format eq 'ARRAY';
-   my $parser_name = 'AnyData/Format/' . $format . '.pm';
-   eval { require $parser_name; };
-   die "Error Opening File-Parser: $@" if $@;
-   $parser_name =~ s#/#::#g;
-   $parser_name =~ s#\.pm$##g;
+    my $class      = shift;
+    my $format     = shift;
+    my $flags      = shift || {};
+    my $del_marker = "\0";
+    $format = 'CSV' if $format eq 'ARRAY';
+    my $parser_name = 'AnyData/Format/' . $format . '.pm';
+    eval { require $parser_name; };
+    die "Error Opening File-Parser: $@" if $@;
+    $parser_name =~ s#/#::#g;
+    $parser_name =~ s#\.pm$##g;
     my $col_names = $flags->{col_names} || undef;
+
     if ($col_names) {
         my @cols;
-        @cols = ref $col_names eq 'ARRAY'
+        @cols =
+          ref $col_names eq 'ARRAY'
           ? @$col_names
-          : split ',',$col_names;
+          : split ',', $col_names;
         $flags->{col_names} = \@cols;
-   }
-   $flags->{del_marker} = $del_marker;
-   $flags->{records}   ||= $flags->{data};
-   $flags->{field_sep} ||= $flags->{sep_char}   ||= $flags->{ad_sep_char};
-   $flags->{quote}     ||= $flags->{quote_char} ||= $flags->{ad_quote_char};
-   $flags->{escape}    ||= $flags->{escape_char}||= $flags->{ad_escape_char};
-   $flags->{record_sep}||= $flags->{eol}        ||= $flags->{ad_eol};
-   # $flags->{skip_first_row}
-   my $parser    = $parser_name->new ($flags);
-   if ($parser->{col_names} && !$col_names) {
+    }
+    $flags->{del_marker} = $del_marker;
+    $flags->{records}    ||= $flags->{data};
+    $flags->{field_sep}  ||= $flags->{sep_char} ||= $flags->{ad_sep_char};
+    $flags->{quote}      ||= $flags->{quote_char} ||= $flags->{ad_quote_char};
+    $flags->{escape}     ||= $flags->{escape_char} ||= $flags->{ad_escape_char};
+    $flags->{record_sep} ||= $flags->{eol} ||= $flags->{ad_eol};
+
+    # $flags->{skip_first_row}
+    my $parser = $parser_name->new($flags);
+    if ( $parser->{col_names} && !$col_names ) {
         my @cols;
-        @cols = ref $parser->{col_names} eq 'ARRAY'
-          ? @{$parser->{col_names}}
-          : split ',',$parser->{col_names};
-        $flags->{col_names} = \@cols;
+        @cols =
+          ref $parser->{col_names} eq 'ARRAY'
+          ? @{ $parser->{col_names} }
+          : split ',', $parser->{col_names};
+        $flags->{col_names}  = \@cols;
         $parser->{col_names} = \@cols;
-   }
-   my $storage_name = $flags->{storage}
-                   || $parser->storage_type()
-                   || 'File';
-   $storage_name = "AnyData/Storage/$storage_name.pm";
-   eval { require $storage_name; };
-   die "Error Opening Storage Module: $@" if $@;
-   $storage_name =~ s#/#::#g;
-   $storage_name =~ s#\.pm$##g;
-   my $storage   = new $storage_name({del_marker=>$del_marker,%$flags});
-   if ($storage_name =~ 'PassThru') {
-       $storage->{parser} = $parser;
-       $parser->{del_marker} = "\0";
-       $parser->{url} = $flags->{file} 
-                      if $flags->{file} and $flags->{file} =~ /http:|ftp:/;
-   }
-   my $self = {
-       storage => $storage,
-       parser  => $parser,
-   };
-   return( bless($self,$class) );
+    }
+    my $storage_name =
+         $flags->{storage}
+      || $parser->storage_type()
+      || 'File';
+    $storage_name = "AnyData/Storage/$storage_name.pm";
+    eval { require $storage_name; };
+    die "Error Opening Storage Module: $@" if $@;
+    $storage_name =~ s#/#::#g;
+    $storage_name =~ s#\.pm$##g;
+    my $storage = new $storage_name( { del_marker => $del_marker, %$flags } );
+
+    if ( $storage_name =~ 'PassThru' ) {
+        $storage->{parser}    = $parser;
+        $parser->{del_marker} = "\0";
+        $parser->{url}        = $flags->{file}
+          if $flags->{file} and $flags->{file} =~ /http:|ftp:/;
+    }
+    my $self = {
+        storage => $storage,
+        parser  => $parser,
+    };
+    return ( bless( $self, $class ) );
 }
 
 sub adFormats {
     my @formats;
-    for my $dir(@INC) {
+    for my $dir (@INC) {
         my $format_dir = "$dir/AnyData/Format";
         if ( -d $format_dir ) {
             local *D;
-            opendir(D,$format_dir);
-            @formats = grep {/\.pm$/} readdir(D);
+            opendir( D, $format_dir );
+            @formats = grep { /\.pm$/ } readdir(D);
             last;
         }
     }
-    unshift @formats,'ARRAY';
-    @formats = map {s/^(.*)\.pm$/$1/;$_} @formats;
+    unshift @formats, 'ARRAY';
+    @formats = map { s/^(.*)\.pm$/$1/; $_ } @formats;
     return @formats;
 }
 
 sub export {
-    my $self=shift;
+    my $self = shift;
     my $fh   = $self->{storage}->{fh};
     my $mode = $self->{storage}->{open_mode} || 'r';
-#    if ( $self->{parser}->{export_on_close}
-#      && $self->{storage}->{fh}
-#      && $mode ne 'r'
-#     ){
-      return $self->{parser}->export( $self->{storage}, @_ );
-#    }
+
+    #    if ( $self->{parser}->{export_on_close}
+    #      && $self->{storage}->{fh}
+    #      && $mode ne 'r'
+    #     ){
+    return $self->{parser}->export( $self->{storage}, @_ );
+
+    #    }
 }
+
 sub DESTROY {
-    my $self=shift;
-#    $self->export;
+    my $self = shift;
+
+    #    $self->export;
     $self->zpack;
+
     #print "AD DESTROYED ";
 }
 ##########################################
@@ -118,15 +131,15 @@ sub prep_dbd_table {
     my $col_names;
     my $col_nums;
     my $first_row_pos;
-    if (!$createMode) {
-        $col_names     = $self->{storage}->get_col_names($self->{parser});
+    if ( !$createMode ) {
+        $col_names     = $self->{storage}->get_col_names( $self->{parser} );
         $col_nums      = $self->{storage}->set_col_nums();
         $first_row_pos = $self->{storage}->{first_row_pos};
     }
     die "ERROR: No Column Names!:", $self->{storage}->{open_mode}
-     if (!$col_names || !scalar @$col_names) 
-     && 'ru' =~ $self->{storage}->{open_mode}
-     && !$createMode eq 'o';
+      if ( !$col_names || !scalar @$col_names )
+      && 'ru' =~ $self->{storage}->{open_mode}
+      && !$createMode eq 'o';
     my $table = {
         NAME          => $tname,
         DATA          => [],
@@ -138,24 +151,27 @@ sub prep_dbd_table {
         file          => $self->{storage}->get_file_name,
         ad            => $self,
     };
+
     #use Data::Dumper; print Dumper $table;
     return $table;
 }
-sub fetch_row   {
-    my $self   = shift;
+
+sub fetch_row {
+    my $self = shift;
     my $requested_cols = shift || [];
     my $rec;
     if ( $self->{parser}->{skip_pattern} ) {
         my $found;
-        while (!$found) {
-            $rec = $self->{storage}->file2str($self->{parser},$requested_cols);
+        while ( !$found ) {
+            $rec =
+              $self->{storage}->file2str( $self->{parser}, $requested_cols );
             last if !defined $rec;
             next if $rec =~ $self->{parser}->{skip_pattern};
             last;
-	}
+        }
     }
     else {
-        $rec = $self->{storage}->file2str($self->{parser},$requested_cols);
+        $rec = $self->{storage}->file2str( $self->{parser}, $requested_cols );
     }
     return $rec if ref $rec eq 'ARRAY';
     return unless $rec;
@@ -163,14 +179,15 @@ sub fetch_row   {
     return undef if scalar @fields == 1 and !defined $fields[0];
     return \@fields;
 }
-sub fetch_rowNEW   {
-    my $self   = shift;
+
+sub fetch_rowNEW {
+    my $self = shift;
     my $requested_cols = shift || [];
-    my $rec    = $self->{storage}->file2str($self->{parser},$requested_cols);
+    my $rec = $self->{storage}->file2str( $self->{parser}, $requested_cols );
     my @fields;
-    if (ref $rec eq 'ARRAY') {
+    if ( ref $rec eq 'ARRAY' ) {
         @fields = @$rec;
-    } 
+    }
     else {
         return unless defined $rec;
         my @fields = $self->{parser}->read_fields($rec);
@@ -178,27 +195,31 @@ sub fetch_rowNEW   {
     }
     if ( my $subs = $self->{parser}->{read_sub} ) {
         for (@$subs) {
-            my($col,$sub) =  @$_;
+            my ( $col, $sub ) = @$_;
             next unless defined $col;
             my $col_num = $self->{storage}->{col_nums}->{$col};
             next unless defined $col_num;
-            $fields[$col_num] = &$sub($fields[$col_num]);
-	}
-      }
+            $fields[$col_num] = &$sub( $fields[$col_num] );
+        }
+    }
     return \@fields;
 }
+
 sub push_names {
     my $self = shift;
     my $col_names = shift || undef;
+
     #print "Can't find column names!" unless scalar @$col_names;
     $self->{storage}->print_col_names( $self->{parser}, $col_names )
-         unless $self->{parser}->{col_names} && $self->parser_type ne 'XML';
+      unless $self->{parser}->{col_names} && $self->parser_type ne 'XML';
+
     #    $self->set_col_nums;
     $self->{parser}->{key} ||= $col_names->[0];
+
     #use Data::Dumper; print Dumper $self; exit;
 }
-sub drop           { shift->{storage}->drop(@_); }
-sub truncate       { shift->{storage}->truncate(@_) }
+sub drop     { shift->{storage}->drop(@_); }
+sub truncate { shift->{storage}->truncate(@_) }
 
 ##################################################################
 # END OF DBD STUFF
@@ -209,40 +230,48 @@ sub truncate       { shift->{storage}->truncate(@_) }
 ##################################################################
 sub push_row {
     my $self = shift;
-    die "ERROR: No Column Names!" unless scalar @{$self->col_names};
+    die "ERROR: No Column Names!" unless scalar @{ $self->col_names };
     my $requested_cols = [];
-    my @row = @_;
-    if (ref($row[0]) eq 'ARRAY') {
+    my @row            = @_;
+    if ( ref( $row[0] ) eq 'ARRAY' ) {
         $requested_cols = shift @row;
     }
     my $rec = $self->{parser}->write_fields(@row) or return undef;
-    return $self->{storage}->push_row( $rec, $self->{parser}, $requested_cols);
+    return $self->{storage}->push_row( $rec, $self->{parser}, $requested_cols );
 }
+
 sub push_rowNEW {
     my $self = shift;
+
     #print "PUSHING... ";
-    die "ERROR: No Column Names!" unless scalar @{$self->col_names};
+    die "ERROR: No Column Names!" unless scalar @{ $self->col_names };
     my $requested_cols = [];
-    my @row = @_;
+    my @row            = @_;
     use Data::Dumper;
+
     #print "PUSHING ", Dumper \@row;
-    if (ref($row[0]) eq 'ARRAY') {
+    if ( ref( $row[0] ) eq 'ARRAY' ) {
         $requested_cols = shift @row;
     }
     my $rec = $self->{parser}->write_fields(@row) or return undef;
-    return $self->{storage}->push_row( $rec, $self->{parser}, $requested_cols);
+    return $self->{storage}->push_row( $rec, $self->{parser}, $requested_cols );
 }
-sub seek              { shift->{storage}->seek(@_); }
-sub seek_first_record { 
-    my $self=shift;
-    $self->{storage}->seek_first_record($self->{parser});
-}
-sub col_names    {
+sub seek { shift->{storage}->seek(@_); }
+
+sub seek_first_record {
     my $self = shift;
-    my $c = $self->{storage}->{col_names};
-    $c = $self->{parser}->{col_names} unless (ref $c eq 'ARRAY') and scalar @$c;
+    $self->{storage}->seek_first_record( $self->{parser} );
+}
+
+sub col_names {
+    my $self = shift;
+    my $c    = $self->{storage}->{col_names};
+    $c = $self->{parser}->{col_names}
+      unless ( ref $c eq 'ARRAY' )
+      and scalar @$c;
     $c ||= [];
 }
+
 sub is_url {
     my $file = shift;
     return $file if $file and $file =~ m"^http://|ftp://";
@@ -253,77 +282,79 @@ sub adTable {
     # Patch from Wes Hardaker
     ###########################################################
     # my($formatref,$file,$read_mode,$lockMode,$othflags)=@_;
-    my($formatref,$file,$read_mode,$lockMode,$othflags,$tname)=@_;
+    my ( $formatref, $file, $read_mode, $lockMode, $othflags, $tname ) = @_;
     ###########################################################
     #use Data::Dumper; print Dumper \@_;
-    my($format,$flags);
+    my ( $format, $flags );
     $file ||= '';
     my $url = is_url($file);
     $flags = {};
     $othflags ||= {};
-    if ( ref $formatref eq 'HASH' or $othflags->{data}) {
+    if ( ref $formatref eq 'HASH' or $othflags->{data} ) {
         $format = 'Base';
-	$flags = $othflags;
-        if (ref $formatref eq 'HASH') {
-            %$flags  = (%$formatref,%$othflags);
-	} 
-   } 
-   else {
-      ($format,$flags) = split_params($formatref);
-      $othflags ||= {};
-      %$flags = (%$flags,%$othflags);
+        $flags  = $othflags;
+        if ( ref $formatref eq 'HASH' ) {
+            %$flags = ( %$formatref, %$othflags );
+        }
+    }
+    else {
+        ( $format, $flags ) = split_params($formatref);
+        $othflags ||= {};
+        %$flags = ( %$flags, %$othflags );
     }
     if ( $flags->{cols} ) {
         $flags->{col_names} = $flags->{cols};
         delete $flags->{cols};
     }
-    if (ref($file) eq 'ARRAY') {
-#TODO: noooooooooo this breaks everything!    
-      if ($format eq 'Mp3' or $format eq 'FileSys' or $format eq 'Foswiki') {
-    	 $flags->{dirs} = $file;
-      } 
-      else {
-         $flags->{recs} = join '',@$file;
-         $flags->{recs} = $file if $format =~ /ARRAY/i;
-         $flags->{storage} = 'RAM' unless $format eq 'XML';
-         $read_mode = 'u';
-      }
+    if ( ref($file) eq 'ARRAY' ) {
+
+        #TODO: noooooooooo this breaks everything!
+        if ( $format eq 'Mp3' or $format eq 'FileSys' or $format eq 'Foswiki' )
+        {
+            $flags->{dirs} = $file;
+        }
+        else {
+            $flags->{recs} = join '', @$file;
+            $flags->{recs} = $file if $format =~ /ARRAY/i;
+            $flags->{storage} = 'RAM' unless $format eq 'XML';
+            $read_mode = 'u';
+        }
     }
     else {
         $flags->{file} = $file;
     }
-    if ($format ne 'XML' and ($format eq 'Base' or $url) ) {
+    if ( $format ne 'XML' and ( $format eq 'Base' or $url ) ) {
         my $x;
         $flags->{storage} = 'RAM';
         delete $flags->{recs};
-        my $ad = AnyData->new( $format, $flags);
+        my $ad = AnyData->new( $format, $flags );
         $format eq 'Base'
-            ? $ad->open_table( $file )
-            : $ad->open_table( $file,  'r',
-                               $ad->{storage}->get_remote_data($file)
-                             );
+          ? $ad->open_table($file)
+          : $ad->open_table( $file, 'r',
+            $ad->{storage}->get_remote_data($file) );
         return $ad;
     }
-    my $ad = AnyData->new( $format, $flags);
+    my $ad = AnyData->new( $format, $flags );
     my $createMode = 0;
     $createMode = $read_mode if defined $lockMode;
-    $read_mode   = 'c' if $createMode  and $lockMode;
-    $read_mode   = 'u' if !$createMode and $lockMode;
+    $read_mode = 'c' if $createMode  and $lockMode;
+    $read_mode = 'u' if !$createMode and $lockMode;
     $read_mode ||= 'r';
-    $ad->{parser}->{keep_first_line} = 1 
-         if $flags->{col_names} and 'ru' =~ /$read_mode/;
+    $ad->{parser}->{keep_first_line} = 1
+      if $flags->{col_names} and 'ru' =~ /$read_mode/;
     #####################################################
     # Patch from Wes Hardaker
     #####################################################
     # $ad->open_table( $file, $read_mode );
 ##    $ad->open_table( $file, $read_mode, $tname );
     $ad->open_table( $file, $read_mode, $tname );
+
 #    use Data::Dumper; my $x = $ad; delete $x->{parser}->{twig}; delete $x->{parser}->{record_tag}; delete $x->{parser}->{current_element}; print Dumper $x;
     #####################################################
     return $ad;
 }
 
-sub open_table     {
+sub open_table {
     my $self = shift;
     $self->{storage}->open_table( $self->{parser}, @_ );
     my $col_names = $self->col_names();
@@ -332,45 +363,49 @@ sub open_table     {
 }
 ##################################################################
 
-
 ##################################################################
 # TIEDHASH STUFF
 ##################################################################
-sub key_col          { shift->{parser}->{key} }
+sub key_col { shift->{parser}->{key} }
 
 sub fetchrow_hashref {
     my $self = shift;
     my $rec = $self->get_undeleted_record or return undef;
-    my  @fields = ref $rec eq 'ARRAY'
-            ? @$rec
-            : $self->{parser}->read_fields($rec);
+    my @fields =
+      ref $rec eq 'ARRAY'
+      ? @$rec
+      : $self->{parser}->read_fields($rec);
     my $col_names = $self->col_names();
     return undef unless scalar @fields;
     return undef if scalar @fields == 1 and !defined $fields[0];
     my $rowhash;
     @{$rowhash}{@$col_names} = @fields;
-    return ( $rowhash );
+    return ($rowhash);
 }
+
 sub get_undeleted_record {
     my $self = shift;
     my $rec;
-    my $found=0;
+    my $found = 0;
     return $self->fetch_row if $self->parser_type eq 'XML';
-    while (!$found) {
-        my $test = $rec    = $self->{storage}->file2str($self->{parser});
-        return  if !defined $rec;
-        next if $self->{storage}->is_deleted($self->{parser});
-        next if $self->{parser}->{skip_pattern} 
-            and $rec =~ $self->{parser}->{skip_pattern};
+    while ( !$found ) {
+        my $test = $rec = $self->{storage}->file2str( $self->{parser} );
+        return if !defined $rec;
+        next   if $self->{storage}->is_deleted( $self->{parser} );
+        next
+          if $self->{parser}->{skip_pattern}
+              and $rec =~ $self->{parser}->{skip_pattern};
         last;
     }
     return $rec;
-#    return $rec if ref $rec eq 'ARRAY';
-#    return unless $rec;
-#    my @fields = $self->{parser}->read_fields($rec);
-#    return undef if scalar @fields == 1 and !defined $fields[0];
-#    return \@fields;
+
+    #    return $rec if ref $rec eq 'ARRAY';
+    #    return unless $rec;
+    #    my @fields = $self->{parser}->read_fields($rec);
+    #    return undef if scalar @fields == 1 and !defined $fields[0];
+    #    return \@fields;
 }
+
 sub update_single_row {
     my $self     = shift;
     my $oldrow   = shift;
@@ -378,60 +413,65 @@ sub update_single_row {
     my @colnames = @{ $self->col_names };
     my @newrow;
     my $requested_cols = [];
-    for my $i(0..$#colnames) {
-        push @$requested_cols, $colnames[$i] if defined $newvals->{$colnames[$i]};
-        $newrow[$i] = $newvals->{$colnames[$i]};
-        $newrow[$i] = $oldrow->{$colnames[$i]} unless defined $newrow[$i];
+    for my $i ( 0 .. $#colnames ) {
+        push @$requested_cols, $colnames[$i]
+          if defined $newvals->{ $colnames[$i] };
+        $newrow[$i] = $newvals->{ $colnames[$i] };
+        $newrow[$i] = $oldrow->{ $colnames[$i] } unless defined $newrow[$i];
     }
     unshift @newrow, $requested_cols;
-    $self->{storage}->seek(0,2);
-    $self->push_row( @newrow );
+    $self->{storage}->seek( 0, 2 );
+    $self->push_row(@newrow);
     return \@newrow;
 }
+
 sub update_multiple_rows {
     my $self   = shift;
     my $key    = shift;
     my $values = shift;
     $self->seek_first_record;
     my @rows_to_update;
-    while (my $row = $self->fetchrow_hashref) {
-        next unless $self->match($row,$key);
+    while ( my $row = $self->fetchrow_hashref ) {
+        next unless $self->match( $row, $key );
         $self->{parser}->{has_update_function}
-            ? $self->update_single_row($row,$values)
-            : $self->delete_single_row();
+          ? $self->update_single_row( $row, $values )
+          : $self->delete_single_row();
         $self->{parser}->{has_update_function}
-            ? push @rows_to_update,1
-            : push @rows_to_update,$row;
+          ? push @rows_to_update, 1
+          : push @rows_to_update, $row;
     }
-    if (!$self->{parser}->{has_update_function}) {
+    if ( !$self->{parser}->{has_update_function} ) {
         for (@rows_to_update) {
-           $self->update_single_row($_,$values);
-	 }
+            $self->update_single_row( $_, $values );
+        }
     }
     return scalar @rows_to_update;
 }
+
 sub match {
-    my($self,$row,$key) = @_;
-    if ( ref $key ne 'HASH') {
-        return 0 if !$row->{$self->key_col}
-                 or  $row->{$self->key_col} ne $key;
+    my ( $self, $row, $key ) = @_;
+    if ( ref $key ne 'HASH' ) {
+        return 0
+          if !$row->{ $self->key_col }
+              or $row->{ $self->key_col } ne $key;
         return 1;
     }
     my $found = 0;
-    while (my($col,$re)=each %$key) {
-        next unless defined $row->{$col} and is_matched($row->{$col},$re);
+    while ( my ( $col, $re ) = each %$key ) {
+        next unless defined $row->{$col} and is_matched( $row->{$col}, $re );
         $found++;
     }
     return 1 if $found == scalar keys %$key;
 }
+
 sub is_matched {
-    my($str,$re)=@_;
-    if (ref $re eq 'Regexp') {
+    my ( $str, $re ) = @_;
+    if ( ref $re eq 'Regexp' ) {
         return $str =~ /$re/ ? 1 : 0;
     }
-    my($op,$val);
-    
-    if ( $re and $re =~/^(\S*)\s+(.*)/ ) {
+    my ( $op, $val );
+
+    if ( $re and $re =~ /^(\S*)\s+(.*)/ ) {
         $op  = $1;
         $val = $2;
     }
@@ -443,55 +483,59 @@ sub is_matched {
     }
     my $numop = '< > == != <= >=';
     my $chrop = 'lt gt eq ne le ge';
-    if (!($numop =~ /$op/) and !($chrop =~ /$op/)) {
+    if ( !( $numop =~ /$op/ ) and !( $chrop =~ /$op/ ) ) {
         return $str =~ /$re/ ? 1 : 0;
     }
-    if ($op eq '<' ) { return $str <  $val; }
-    if ($op eq '>' ) { return $str >  $val; }
-    if ($op eq '==') { return $str == $val; }
-    if ($op eq '!=') { return $str != $val; }
-    if ($op eq '<=') { return $str <= $val; }
-    if ($op eq '>=') { return $str >= $val; }
-    if ($op eq 'lt') { return $str lt $val; }
-    if ($op eq 'gt') { return $str gt $val; }
-    if ($op eq 'eq') { return $str eq $val; }
-    if ($op eq 'ne') { return $str ne $val; }
-    if ($op eq 'le') { return $str le $val; }
-    if ($op eq 'ge') { return $str ge $val; }
+    if ( $op eq '<' )  { return $str < $val; }
+    if ( $op eq '>' )  { return $str > $val; }
+    if ( $op eq '==' ) { return $str == $val; }
+    if ( $op eq '!=' ) { return $str != $val; }
+    if ( $op eq '<=' ) { return $str <= $val; }
+    if ( $op eq '>=' ) { return $str >= $val; }
+    if ( $op eq 'lt' ) { return $str lt $val; }
+    if ( $op eq 'gt' ) { return $str gt $val; }
+    if ( $op eq 'eq' ) { return $str eq $val; }
+    if ( $op eq 'ne' ) { return $str ne $val; }
+    if ( $op eq 'le' ) { return $str le $val; }
+    if ( $op eq 'ge' ) { return $str ge $val; }
 }
+
 sub delete_single_row {
     my $self = shift;
-#    my $curpos = $self->{storage}->get_pos;
-    $self->{storage}->delete_record($self->{parser});
-#    $self->{storage}->go_pos($curpos);
+
+    #    my $curpos = $self->{storage}->get_pos;
+    $self->{storage}->delete_record( $self->{parser} );
+
+    #    $self->{storage}->go_pos($curpos);
     $self->{needs_packing}++;
 }
+
 sub delete_multiple_rows {
-    my $self   = shift;
-    my $key    = shift;
+    my $self = shift;
+    my $key  = shift;
     $self->seek_first_record;
-    my $rows_deleted =0;
-    while (my $row = $self->fetchrow_hashref) {
-        next unless $self->match($row,$key);
+    my $rows_deleted = 0;
+    while ( my $row = $self->fetchrow_hashref ) {
+        next unless $self->match( $row, $key );
         $self->delete_single_row;
         $rows_deleted++;
     }
     return $rows_deleted;
 }
 
-sub adNames { @{ shift->{__colnames}} }
+sub adNames { @{ shift->{__colnames} } }
 
 sub adDump {
     my $table = shift;
     my $pat   = shift;
     die "No table defined" unless $table;
-    my $ad = tied(%$table)->{ad};
+    my $ad   = tied(%$table)->{ad};
     my @cols = @{ $ad->col_names };
-    print "<",join(":", @cols), ">\n";
-    while (my $row = each %$table) {
-        my @row  = map {$row->{$_} || ''} @cols;
+    print "<", join( ":", @cols ), ">\n";
+    while ( my $row = each %$table ) {
+        my @row = map { $row->{$_} || '' } @cols;
         for (@row) { print "[$_]"; }
-        print  "\n";
+        print "\n";
     }
 }
 
@@ -499,19 +543,21 @@ sub adRows {
     my $thash = shift;
     my %keys  = @_;
     my $obj   = tied(%$thash);
-    return $obj->adRows(\%keys)
+    return $obj->adRows( \%keys );
 }
+
 sub adColumn {
     my $thash  = shift;
     my $column = shift;
     my $obj    = tied(%$thash);
-    return $obj->adColumn($column)
+    return $obj->adColumn($column);
 }
+
 sub adArray {
-    my($format,$data)=@_;
-    my $t = adTie( $format, $data );
-    my $t1 = tied(%$t);
-    my $ad = $t1->{ad};
+    my ( $format, $data ) = @_;
+    my $t        = adTie( $format, $data );
+    my $t1       = tied(%$t);
+    my $ad       = $t1->{ad};
     my $arrayref = $ad->{storage}->{records};
     unshift @$arrayref, $ad->{storage}->{col_names};
     return $arrayref;
@@ -524,15 +570,17 @@ sub parser_type {
     $type =~ s/AnyData::Format::(.*)/$1/;
     return $type;
 }
+
 sub zpack {
     my $self = shift;
     return if $self->{storage}->{no_pack};
-    return if (ref $self->{storage} ) !~ /File$/;
+    return if ( ref $self->{storage} ) !~ /File$/;
 
-#    return unless $self->{needs_packing};
-#    $self->{needs_packing} = 0;
-    return unless scalar(keys %{ $self->{storage}->{deleted} } );
+    #    return unless $self->{needs_packing};
+    #    $self->{needs_packing} = 0;
+    return unless scalar( keys %{ $self->{storage}->{deleted} } );
     $self->{needs_packing} = 0;
+
     #    my @callA = caller 2;
     #    my @callB = caller 3;
     #    return if $callA[3] =~ /DBD/;
@@ -540,25 +588,27 @@ sub zpack {
     #    return if $self->{parser}->{export_on_close};
     #print "PACKING";
     my $bak_file = $self->{storage}->get_file_name . '.bak';
-    my $bak = adTable( 'Text', $bak_file, 'o' );
-    my $bak_fh = $bak->{storage}->get_file_handle;
-    my $fh     = $self->{storage}->get_file_handle;
+    my $bak      = adTable( 'Text', $bak_file, 'o' );
+    my $bak_fh   = $bak->{storage}->get_file_handle;
+    my $fh       = $self->{storage}->get_file_handle;
     die "Can't pack to backup $!" unless $fh and $bak_fh;
+
     # $self->seek_first_record;
-    $fh->seek(0,0) || die $!;
+    $fh->seek( 0, 0 ) || die $!;
+
     #$bak_fh->seek(0,0) || die $!;
-#    while (my $line = $self->get_record) {
-#        next if $self->is_deleted($line);
-    while (my $line = $self->get_undeleted_record) {
-        my $tmpstr = $bak->{parser}->write_fields($line)
-                   . $self->{parser}->{record_sep};
-        $bak_fh->write($tmpstr,length $tmpstr);
+    #    while (my $line = $self->get_record) {
+    #        next if $self->is_deleted($line);
+    while ( my $line = $self->get_undeleted_record ) {
+        my $tmpstr =
+          $bak->{parser}->write_fields($line) . $self->{parser}->{record_sep};
+        $bak_fh->write( $tmpstr, length $tmpstr );
     }
-    $fh->seek(0,0);
+    $fh->seek( 0, 0 );
     $fh->truncate(0) || die $!;
     $bak->seek_first_record;
     while (<$bak_fh>) {
-        $fh->write($_,length $_);
+        $fh->write( $_, length $_ );
     }
     $fh->close;
     $bak_fh->close;
@@ -570,155 +620,156 @@ sub zpack {
 #  FUNCTION CALL INTERFACE
 ##########################################################
 sub adTie {
-    my($format,$file,$read_mode,$flags)=@_;
+    my ( $format, $file, $read_mode, $flags ) = @_;
     my $data;
-    if (ref $file eq 'ARRAY' && !$read_mode ) { $read_mode = 'u'; }
+    if ( ref $file eq 'ARRAY' && !$read_mode ) { $read_mode = 'u'; }
+
     # ARRAY only {data=>[]};
-    if (scalar @_ == 1){
+    if ( scalar @_ == 1 ) {
         $read_mode = 'o';
-        tie %$data,
-            'AnyData::Storage::TiedHash',
-            adTable($format),
-            $read_mode;
+        tie %$data, 'AnyData::Storage::TiedHash', adTable($format), $read_mode;
         return $data;
     }
     tie %$data,
-        'AnyData::Storage::TiedHash',
-        adTable($format,$file,$read_mode,undef,$flags),
-        $read_mode;
+      'AnyData::Storage::TiedHash',
+      adTable( $format, $file, $read_mode, undef, $flags ),
+      $read_mode;
     return $data;
 }
+
 sub adErr {
-    my $hash = shift;
-    my $t = tied(%$hash);
+    my $hash   = shift;
+    my $t      = tied(%$hash);
     my $errstr = $t->{ad}->{parser}->{errstr}
-        || $t->{ad}->{storage}->{errstr};
+      || $t->{ad}->{storage}->{errstr};
     print $errstr if $errstr;
     return $errstr;
 }
+
 sub adExport {
-    my $tiedhash  = shift;
-    my($tformat,$tfile,$tflags)=@_;
-    my $ad = tied(%$tiedhash)->{ad};
+    my $tiedhash = shift;
+    my ( $tformat, $tfile, $tflags ) = @_;
+    my $ad      = tied(%$tiedhash)->{ad};
     my $sformat = ref $ad->{parser};
     $sformat =~ s/AnyData::Format:://;
     $tformat ||= $sformat;
-    if ($tformat eq $sformat and $tformat eq 'XML') {
-      return $ad->{parser}->export($ad->{storage},$tfile,$tflags);
+    if ( $tformat eq $sformat and $tformat eq 'XML' ) {
+        return $ad->{parser}->export( $ad->{storage}, $tfile, $tflags );
     }
-    return adConvert('adHash',$ad,$tformat,$tfile,undef,$tflags);
+    return adConvert( 'adHash', $ad, $tformat, $tfile, undef, $tflags );
 }
+
 sub adConvert {
-    my( $source_format, $source_data,
-        $target_format,$target_file_name,
-        $source_flags,$target_flags    )=@_;
+    my (
+        $source_format,    $source_data,  $target_format,
+        $target_file_name, $source_flags, $target_flags
+    ) = @_;
 
     my $target_type = 'STRING';
-       $target_type = 'FILE'  if defined $target_file_name;
-       $target_type = 'ARRAY' if $target_format eq 'ARRAY';
+    $target_type = 'FILE' if defined $target_file_name;
+    $target_type = 'ARRAY' if $target_format eq 'ARRAY';
 
     my $data_type = 'AD-OBJECT';
-       $data_type = 'ARRAY'  if  ref $source_data eq 'ARRAY'
-                            and  ref $source_data->[0] eq 'ARRAY';
+    $data_type = 'ARRAY'
+      if ref $source_data eq 'ARRAY'
+          and ref $source_data->[0] eq 'ARRAY';
 
     # INIT SOURCE OBJECT
     my $source_ad;
-    if ($source_format eq 'adHash') {
+    if ( $source_format eq 'adHash' ) {
         $source_ad = $source_data;
         undef $source_data;
-    } 
+    }
     else {
         $source_format = 'CSV' if $source_format =~ /ARRAY/i;
-        $source_ad = adTable(
-             $source_format,$source_data,'r',undef,$source_flags
-        );
+        $source_ad =
+          adTable( $source_format, $source_data, 'r', undef, $source_flags );
     }
 
     # GET COLUMN NAMES
     my @cols;
-    if ( $data_type eq 'ARRAY') {
-        @cols = @{ shift @{ $source_data  } };
+    if ( $data_type eq 'ARRAY' ) {
+        @cols = @{ shift @{$source_data} };
     }
     else {
         @cols = @{ $source_ad->col_names };
     }
 
-
     # insert storable here
-    if ('XML HTMLtable' =~ /$target_format/) {
-        $target_flags->{col_names} = join ',',@cols;
-        my $target_ad = adTable(
-            $target_format,$target_file_name,'o',undef,$target_flags
-        );
-        if ($data_type eq 'ARRAY' ) {
-             for my $row(@$source_data) {
-                 my @fields=$source_ad->str2ary($row);
-                 $target_ad->push_row( $source_ad->str2ary(\@fields) );
-             }
-             unshift @$source_data, \@cols;
-             return $target_ad->export($target_file_name);
+    if ( 'XML HTMLtable' =~ /$target_format/ ) {
+        $target_flags->{col_names} = join ',', @cols;
+        my $target_ad = adTable( $target_format, $target_file_name, 'o', undef,
+            $target_flags );
+        if ( $data_type eq 'ARRAY' ) {
+            for my $row (@$source_data) {
+                my @fields = $source_ad->str2ary($row);
+                $target_ad->push_row( $source_ad->str2ary( \@fields ) );
+            }
+            unshift @$source_data, \@cols;
+            return $target_ad->export($target_file_name);
         }
         $source_ad->seek_first_record;
-        while (my $row = $source_ad->get_undeleted_record) {
+        while ( my $row = $source_ad->get_undeleted_record ) {
             $target_ad->push_row( $source_ad->str2ary($row) );
         }
         return $target_ad->export($target_file_name);
     }
 
-    my($target_ad,$fh);
+    my ( $target_ad, $fh );
     ### INIT TARGET OBJECT
-    if ($target_type eq 'FILE') {
-        $target_ad = adTable(
-            $target_format,$target_file_name,'c',undef,$target_flags
-        );
+    if ( $target_type eq 'FILE' ) {
+        $target_ad = adTable( $target_format, $target_file_name, 'c', undef,
+            $target_flags );
         $fh = $target_ad->{storage}->get_file_handle;
     }
-    elsif ($target_type eq 'STRING') {
-        $target_ad = AnyData->new( $target_format,$target_flags);
+    elsif ( $target_type eq 'STRING' ) {
+        $target_ad = AnyData->new( $target_format, $target_flags );
     }
 
-    my($str,$aryref);
+    my ( $str, $aryref );
     ### GET COLUMN NAMES
     if ( !$target_ad->{parser}->{no_col_print} ) {
-        if ($target_type eq 'ARRAY') {
+        if ( $target_type eq 'ARRAY' ) {
             push @$aryref, \@cols;
         }
         else {
-        $str = $target_ad->{parser}->write_fields(@cols);
-        $str =~ s/ /,/g if $target_format eq 'Fixed';
-        if ($target_type eq 'FILE') {
-            $fh->write($str,length $str);
-	}
-        if ($target_type eq 'STRING') {
             $str = $target_ad->{parser}->write_fields(@cols);
-	}
-	}
+            $str =~ s/ /,/g if $target_format eq 'Fixed';
+            if ( $target_type eq 'FILE' ) {
+                $fh->write( $str, length $str );
+            }
+            if ( $target_type eq 'STRING' ) {
+                $str = $target_ad->{parser}->write_fields(@cols);
+            }
+        }
     }
 
     # GET DATA
-    if ($data_type eq 'ARRAY') {
-      for my $row(@$source_data) {
-        my @fields = $source_ad->str2ary($row);
-        my $tmpstr = $target_ad->{parser}->write_fields(@fields);
-        # print $tmpstr if $check;
-        $fh->write($tmpstr,length $tmpstr) if $target_type eq 'FILE';
-        $str .=  $tmpstr if $target_type eq 'STRING';
-      }
-      unshift @$source_data, \@cols;
-      return $str if $target_format ne 'ARRAY';
-      return $aryref;
+    if ( $data_type eq 'ARRAY' ) {
+        for my $row (@$source_data) {
+            my @fields = $source_ad->str2ary($row);
+            my $tmpstr = $target_ad->{parser}->write_fields(@fields);
+
+            # print $tmpstr if $check;
+            $fh->write( $tmpstr, length $tmpstr ) if $target_type eq 'FILE';
+            $str .= $tmpstr if $target_type eq 'STRING';
+        }
+        unshift @$source_data, \@cols;
+        return $str if $target_format ne 'ARRAY';
+        return $aryref;
     }
-    $source_ad->seek_first_record; # unless $source_format eq 'XML';
-    while (my $row = $source_ad->get_undeleted_record) {
-        if ($target_format eq 'ARRAY') {
-            push @$aryref,$row if $target_format eq 'ARRAY';
+    $source_ad->seek_first_record;    # unless $source_format eq 'XML';
+    while ( my $row = $source_ad->get_undeleted_record ) {
+        if ( $target_format eq 'ARRAY' ) {
+            push @$aryref, $row if $target_format eq 'ARRAY';
             next;
         }
         my @fields = $source_ad->str2ary($row);
         my $tmpstr = $target_ad->{parser}->write_fields(@fields);
-        $str .= $target_type eq 'FILE'
-           ? $fh->write($tmpstr,length $tmpstr)
-           : $tmpstr;
+        $str .=
+            $target_type eq 'FILE'
+          ? $fh->write( $tmpstr, length $tmpstr )
+          : $tmpstr;
     }
     return $str if $target_format ne 'ARRAY';
     return $aryref;
@@ -745,36 +796,40 @@ sub adConvert {
 #  }
 
 sub str2ary {
-    my($ad,$row) = @_;
+    my ( $ad, $row ) = @_;
     return @$row if ref $row eq 'ARRAY';
     return $ad->{parser}->read_fields($row);
 }
+
 sub ad_string {
-    my($formatref,@fields) = @_;
-    my($format,$flags) = split_params($formatref);
-# &dump($formatref); print "<$format>"; &dump($flags) if $flags;
+    my ( $formatref, @fields ) = @_;
+    my ( $format,    $flags )  = split_params($formatref);
+
+    # &dump($formatref); print "<$format>"; &dump($flags) if $flags;
     #$formatref =~ s/(.*)/$1/;
     my $ad = AnyData->new( $format, $flags );
     return $ad->{parser}->write_fields(@fields);
-#    return $ad->write_fields(@fields);
+
+    #    return $ad->write_fields(@fields);
 }
 
 sub ad_fields {
-    my($formatref,$str,$flags) = @_;
-#    my($format,$flags) = split_params($formatref);
-#    my $ad = AnyData::new( $format, $flags );
+    my ( $formatref, $str, $flags ) = @_;
+
+    #    my($format,$flags) = split_params($formatref);
+    #    my $ad = AnyData::new( $format, $flags );
     my $ad = AnyData->new( $formatref, $flags );
     return $ad->{parser}->read_fields($str);
 }
 
 sub ad_convert_str {
-    my($source_formatref,$target_formatref,$str) = @_;
-    my($source_format,$source_flags) = split_params($source_formatref);
-    my($target_format,$target_flags) = split_params($target_formatref);
-    my $source_ad = AnyData->new( $source_format,$source_flags);
-    my $target_ad = AnyData->new( $target_format,$target_flags);
-    my @fields = $source_ad->read_fields($str);
-    return $target_ad->write_fields( @fields );
+    my ( $source_formatref, $target_formatref, $str ) = @_;
+    my ( $source_format, $source_flags ) = split_params($source_formatref);
+    my ( $target_format, $target_flags ) = split_params($target_formatref);
+    my $source_ad = AnyData->new( $source_format, $source_flags );
+    my $target_ad = AnyData->new( $target_format, $target_flags );
+    my @fields    = $source_ad->read_fields($str);
+    return $target_ad->write_fields(@fields);
 }
 
 #########################################################
@@ -791,23 +846,26 @@ sub ad_convert_str {
 #
 sub split_params {
     my $source_formatref = shift;
-    my $source_flags = {};
-    my $source_format  = $source_formatref;
-    if (ref $source_formatref eq 'HASH') {
-      while (my($k,$v)=each %$source_formatref) {
-           ($source_format,$source_flags) = ($k,$v);
-      }
+    my $source_flags     = {};
+    my $source_format    = $source_formatref;
+    if ( ref $source_formatref eq 'HASH' ) {
+        while ( my ( $k, $v ) = each %$source_formatref ) {
+            ( $source_format, $source_flags ) = ( $k, $v );
+        }
     }
+
     #use Data::Dumper;
-    return( $source_format, $source_flags);
+    return ( $source_format, $source_flags );
 }
+
 sub dump {
-    my $var = shift;
+    my $var  = shift;
     my $name = ref($var);
+
     #use Data::Dumper;
     $Data::Dumper::Indent = 1;
     $Data::Dumper::Useqq  = 0;
-    print Data::Dumper->new([$var],[$name])->Dump();
+    print Data::Dumper->new( [$var], [$name] )->Dump();
 }
 
 ###########################################################################

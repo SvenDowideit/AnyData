@@ -51,7 +51,6 @@ all rights reserved
 
 =cut
 
-
 use AnyData;
 use AnyData::Format::CSV;
 use strict;
@@ -63,30 +62,30 @@ $VERSION = '0.05';
 sub new {
     my $class = shift;
     my $flags = shift || {};
-    my $f = $flags->{record_sep} || '';
+    my $f     = $flags->{record_sep} || '';
+
     #print "<$f>";
     $flags->{field_sep}  = "\n";
     $flags->{record_sep} = "\n\n";
+
     #print "[",$flags->{record_sep},"]";
-    my $self  = AnyData::Format::CSV::->new( $flags );
+    my $self = AnyData::Format::CSV::->new($flags);
     return bless $self, $class;
 }
 
-sub write_fields  {
-    my($self,@fields) = @_;
-    @fields = map {$_ || ''} @fields;
-    return join("\n",@fields) . $self->{record_sep};
+sub write_fields {
+    my ( $self, @fields ) = @_;
+    @fields = map { $_ || '' } @fields;
+    return join( "\n", @fields ) . $self->{record_sep};
 }
 
 sub read_fields {
     my $self = shift;
-    my $str  = shift || return undef;
+    my $str = shift || return undef;
     return undef unless $str;
     my @fields = split /\n/, $str;
-    @fields = map{s/\s+$//; $_}@fields;
+    @fields = map { s/\s+$//; $_ } @fields;
     die "Couldn't parse line '$str'\n" unless defined $fields[0];
-    return( @fields );
+    return (@fields);
 }
-
-
 

@@ -56,6 +56,7 @@ copyright 2012, Sven Dowideit L<mailto:SvenDowideit@fosiki.com>
 all rights reserved
 
 =cut
+
 use strict;
 use AnyData::Format::Base;
 use AnyData::Storage::FileSys;
@@ -64,23 +65,24 @@ use vars qw( @ISA $VERSION);
 @AnyData::Format::Foswiki::ISA = qw( AnyData::Format::Base );
 
 $VERSION = '0.01';
-my @columns = qw/web name author date version parent text formname filename filesize/;
+my @columns =
+  qw/web name author date version parent text formname filename filesize/;
 
 sub new {
     my $class = shift;
-    my $self  = shift ||  {};
-    my $dirs = $self->{dirs} || $self->{file_name} || $self->{recs};
-    $self->{col_names} = join(',', @columns);
+    my $self  = shift || {};
+    my $dirs  = $self->{dirs} || $self->{file_name} || $self->{recs};
+    $self->{col_names} = join( ',', @columns );
+
     #use Data::Dumper; die Dumper $self;
-    $self->{recs}   = 
-    $self->{records}   = get_data( $dirs );
+    $self->{recs} = $self->{records} = get_data($dirs);
     return bless $self, $class;
 }
 
 sub storage_type { 'RAM'; }
 
 sub read_fields {
-    my $self = shift;
+    my $self  = shift;
     my $thing = shift;
     return @$thing if ref $thing eq 'ARRAY';
     return split ',', $thing;
@@ -90,15 +92,15 @@ sub read_fields {
 sub write_fields { die "WRITING NOT IMPLEMENTED FOR FORMAT Foswiki"; }
 
 sub get_data {
-    my $dirs = shift;
+    my $dirs  = shift;
     my $table = [];
     my @files = AnyData::Storage::FileSys::get_filename_parts(
-	{},
+        {},
         part => 'ext',
         re   => 'txt',
         dirs => $dirs
     );
-    for my $file_info(@files) {
+    for my $file_info (@files) {
         my $file = $file_info->[0];
         my $cols = load_foswiki_topic($file) || next;
         push @$table, $cols;
@@ -107,66 +109,68 @@ sub get_data {
 }
 
 sub load_foswiki_topic {
-    my($file)   = shift;
+    my ($file) = shift;
     my $adf = AnyData::Storage::File->new;
-    my(undef,$fh,undef) = $adf->open_local_file($file,'r');
+    my ( undef, $fh, undef ) = $adf->open_local_file( $file, 'r' );
     local undef $/;
     my $complete_file = <$fh> || '';
     $fh->close;
-    
-    my @str = split(/\n/, $complete_file);
+
+    my @str = split( /\n/, $complete_file );
 
     my %meta;
-    @meta{@columns} = ''; #I think the columns all need to be there :/
+    @meta{@columns} = '';    #I think the columns all need to be there :/
     my $filesize = -s $file;
-    $meta{filesize} = sprintf "%1.fmb", $filesize/1000000;
+    $meta{filesize} = sprintf "%1.fmb", $filesize / 1000000;
     $meta{file} = $file;
     $file =~ /.*data\/(.*?)\/(.*?).txt/;
-    $meta{web} = $1;
+    $meta{web}  = $1;
     $meta{name} = $2;
-    
+
     # first get rid of the leading META
-    if ($str[0] =~ /\%META:TOPICINFO{(.*?)}\%$/) {
-      my $params = $1;
-      parse_params('TOPICINFO', $1, \%meta, qw/author date version format/);
-      $meta{rev} = $meta{version};  #legacy to match up with foswiki query syntax
-      shift(@str);
+    if ( $str[0] =~ /\%META:TOPICINFO{(.*?)}\%$/ ) {
+        my $params = $1;
+        parse_params( 'TOPICINFO', $1, \%meta, qw/author date version format/ );
+        $meta{rev} =
+          $meta{version};    #legacy to match up with foswiki query syntax
+        shift(@str);
     }
-    if ($str[0] =~ /\%META:TOPICPARENT{(.*?)}\%$/) {
-      my $params = $1;
-      my %temp;
-      parse_params('TOPICPARENT', $1, \%temp, qw/name/);
-      $meta{parent} = $temp{name};
-      shift(@str);
+    if ( $str[0] =~ /\%META:TOPICPARENT{(.*?)}\%$/ ) {
+        my $params = $1;
+        my %temp;
+        parse_params( 'TOPICPARENT', $1, \%temp, qw/name/ );
+        $meta{parent} = $temp{name};
+        shift(@str);
     }
-    #then the trailing META 
-    while ($str[$#str] =~ /\%META:(.*?){(.*?)}\%$/) {
+
+    #then the trailing META
+    while ( $str[$#str] =~ /\%META:(.*?){(.*?)}\%$/ ) {
         my $params = $2;
-        if ($1 eq 'FORM') {
+        if ( $1 eq 'FORM' ) {
+
             #TODO: this should be the top META - there are order restrictions...
-          my %temp;
-          parse_params('FORM', $params, \%temp, qw/name/);
-          $meta{formname} = $temp{name};
-        } else {
-          my %temp;
-          parse_params($1, $params, \%temp, qw/name/);
+            my %temp;
+            parse_params( 'FORM', $params, \%temp, qw/name/ );
+            $meta{formname} = $temp{name};
+        }
+        else {
+            my %temp;
+            parse_params( $1, $params, \%temp, qw/name/ );
         }
         pop(@str);
     }
-    
+
     #and thus we're left with the topic text
-    $meta{text} = join("\n", @str);
+    $meta{text} = join( "\n", @str );
 
     my @cols = @meta{@columns};
     return \@cols;
 }
 
 sub parse_params {
-  my ($metaname, $str, $meta, @attrs) = @_;
-  my $args = _readKeyValues($str);
-  map {
-    $meta->{$_} = $args->{$_} if (exists($args->{$_}));
-    } @attrs;
+    my ( $metaname, $str, $meta, @attrs ) = @_;
+    my $args = _readKeyValues($str);
+    map { $meta->{$_} = $args->{$_} if ( exists( $args->{$_} ) ); } @attrs;
 }
 
 #from Foswiki::Meta

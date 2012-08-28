@@ -50,7 +50,6 @@ all rights reserved
 
 =cut
 
-
 use strict;
 use AnyData::Format::Base;
 use vars qw( @ISA $VERSION);
@@ -60,66 +59,63 @@ $VERSION = '0.05';
 
 sub new {
     my $class = shift;
-    my $self  = shift ||  {};
-    my $s = ${self}->{field_rsep} || ${self}->{field_sep} || q(,);
-    my $s1 = $s;
+    my $self  = shift || {};
+    my $s     = ${self}->{field_rsep} || ${self}->{field_sep} || q(,);
+    my $s1    = $s;
+
     #$s1 =~ s/\\/\\\\/ if $s1 =~ /\+$/;
     #$s1 =~ s/\+$//;
     #die $s1;
-    ${self}->{field_sep}          ||= q(,);
-    my $q = ${self}->{quote}      ||= q(");
-    my $e = ${self}->{escape}     ||= q(");
-    ${self}->{record_sep}         ||= qq(\n);
-    $self->{regex} = [
-        qr/$q((?:(?:$e$q)|[^$q])*)$q$s?|([^$s1]+)$s?|$s/,
-        "$e$q",
-        $q
-    ];
+    ${self}->{field_sep} ||= q(,);
+    my $q = ${self}->{quote}  ||= q(");
+    my $e = ${self}->{escape} ||= q(");
+    ${self}->{record_sep} ||= qq(\n);
+    $self->{regex} =
+      [ qr/$q((?:(?:$e$q)|[^$q])*)$q$s?|([^$s1]+)$s?|$s/, "$e$q", $q ];
     return bless $self, $class;
 }
 
 sub read_fields {
-    my $self = shift;
-    my $str  = shift || return undef;
+    my $self   = shift;
+    my $str    = shift || return undef;
     my @fields = ();
     my $captured;
     my $field_wsep = $self->{field_wsep} || $self->{field_sep};
-    if ($self->{trim}) {
+    if ( $self->{trim} ) {
         $str =~ s/\s*($field_wsep)\s*/$1/g;
     }
-    while ($str =~ m#$self->{regex}->[0]#g) {
-         $captured = $+;
-         $captured =~ s/$self->{regex}[1]/$self->{regex}[2]/g if $captured;
-         last if $captured && $captured eq "\n";
-         push(@fields,$captured);
-     };
-     push(@fields, undef) if substr($str,-1,1) eq $field_wsep;
-     return @fields;
+    while ( $str =~ m#$self->{regex}->[0]#g ) {
+        $captured = $+;
+        $captured =~ s/$self->{regex}[1]/$self->{regex}[2]/g if $captured;
+        last if $captured && $captured eq "\n";
+        push( @fields, $captured );
+    }
+    push( @fields, undef ) if substr( $str, -1, 1 ) eq $field_wsep;
+    return @fields;
 }
 
 sub write_fields {
-    my $self   = shift;
-    my @fields = @_;
-    my $str    = '';
+    my $self       = shift;
+    my @fields     = @_;
+    my $str        = '';
     my $field_rsep = $self->{field_rsep} || $self->{field_sep};
     $field_rsep = quotemeta($field_rsep);
     my $field_wsep = $self->{field_sep};
     $field_wsep =~ s/\\//g;
-#    if ($self->{ChopBlanks}) {
-#        $field_wsep =~ " $field_wsep ";
-#    }
+
+    #    if ($self->{ChopBlanks}) {
+    #        $field_wsep =~ " $field_wsep ";
+    #    }
     for (@fields) {
         $_ = '' if !defined $_;
-        if ($self->{field_sep} eq ',') {
+        if ( $self->{field_sep} eq ',' ) {
             s/"/""/g;
             s/^(.*)$/"$1"/s if /,/ or /\n/s or /"/;
-	}
+        }
         $str .= $_ . $field_wsep;
     }
     $str =~ s/$self->{field_sep}$/$self->{record_sep}/;
     return $str;
 }
 1;
-
-
 
