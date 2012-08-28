@@ -278,8 +278,9 @@ sub adTable {
         delete $flags->{cols};
     }
     if (ref($file) eq 'ARRAY') {
-      if ($format eq 'Mp3' or $format eq 'FileSys') {
-	 $flags->{dirs} = $file;
+#TODO: noooooooooo this breaks everything!    
+      if ($format eq 'Mp3' or $format eq 'FileSys' or $format eq 'Foswiki') {
+    	 $flags->{dirs} = $file;
       } 
       else {
          $flags->{recs} = join '',@$file;
@@ -1339,7 +1340,7 @@ For example:
 
   # same with username/password
   #
-  my $table = ( 'XML', 'ftp://www.foo.edu/pub/bar.xml', 'r'
+  my $table = adTie( 'XML', 'ftp://www.foo.edu/pub/bar.xml', 'r'
                 { user => 'me', pass => 'x7dy4'
               );
 
