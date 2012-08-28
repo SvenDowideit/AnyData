@@ -50,6 +50,13 @@ Choose 'Foswiki' as the format and give a reference to an array of directories c
 
 This module is used via the AnyData.pm and DBD::AnyData.pm modules.  Refer to their documentation for further details.
 
+=head1 Future ideas
+
+I suspect that the better way to implement this, is to make a AnyData::Format::FoswikiTopic that dynamically works out that topic's tml column names
+and then to collate all the topic 'tables' into one FoswikiWeb table that contains all those columns.
+
+that way we get huge flat table - the way that the foswiki query engine works.. (ie, users expect)
+
 =head1 AUTHOR & COPYRIGHT
 
 copyright 2012, Sven Dowideit L<mailto:SvenDowideit@fosiki.com>
@@ -94,6 +101,7 @@ sub write_fields { die "WRITING NOT IMPLEMENTED FOR FORMAT Foswiki"; }
 sub get_data {
     my $dirs  = shift;
     my $table = [];
+
     my @files = AnyData::Storage::FileSys::get_filename_parts(
         {},
         part => 'ext',
