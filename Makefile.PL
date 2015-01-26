@@ -18,9 +18,10 @@ ExtUtils::MakeMaker::WriteMakefile(
         'BUILD_REQUIRES'     => {
             'Test::Output'                        => '0.01',
             'Test::More'                          => '0.9',
-            'CGI'                                 => '0',
         },
-        'PREREQ_PM' => {},
+        'PREREQ_PM' => {
+                        'CGI' => '0'
+                        },
         "test"      => { "TESTS" => "t/*.t" },
         "META_ADD"  => {
             resources => {
