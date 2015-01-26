@@ -19,12 +19,14 @@ ExtUtils::MakeMaker::WriteMakefile(
             'Test::Output'                        => '0.01',
             'Test::More'                          => '0.9',
         },
-        'PREREQ_PM' => {},
+        'PREREQ_PM' => {
+                        'CGI' => '0'
+                        },
         "test"      => { "TESTS" => "t/*.t" },
         "META_ADD"  => {
             resources => {
-                homepage   => 'http://github.com/SvenDowideit/Data-Foswiki',
-                repository => 'git://github.com/SvenDowideit/Data-Foswiki.git',
+                homepage   => 'https://github.com/SvenDowideit/AnyData',
+                repository => 'git://github.com/SvenDowideit/AnyData.git',
 
                 #            x_twitter => 'http://twitter.com/SvenDowideit/',
             }
